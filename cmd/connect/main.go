@@ -4,10 +4,8 @@ import (
 	"context"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/justericgg/irepair/infra/repository/ddb"
+	"log"
 )
 
 type Event struct {
@@ -20,22 +18,10 @@ type Item struct {
 
 func HandleRequest(ctx context.Context, event Event) (events.APIGatewayProxyResponse, error) {
 
-	sess, err := session.NewSession(&aws.Config{Region: aws.String("us-west-2")})
+	err := ddb.Put(event.RequestContext.ConnectionID)
 	if err != nil {
-		return events.APIGatewayProxyResponse{Body: "Session Error", StatusCode: 500}, nil
-	}
-
-	item := Item{ConnectionId: event.RequestContext.ConnectionID}
-
-	ddb := dynamodb.New(sess)
-	attr, err := dynamodbattribute.MarshalMap(item)
-	input := &dynamodb.PutItemInput{
-		Item:      attr,
-		TableName: aws.String("iRepairChatRoom"),
-	}
-	_, err = ddb.PutItem(input)
-	if err != nil {
-		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
+		log.Println(err)
+		return events.APIGatewayProxyResponse{Body: "ddb error", StatusCode: 500}, nil
 	}
 
 	return events.APIGatewayProxyResponse{Body: "ok", StatusCode: 200}, nil

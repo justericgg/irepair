@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/apigatewaymanagementapi"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/justericgg/irepair/infra/adpter/api"
+	"github.com/justericgg/irepair/infra/repository/ddb"
 	"log"
+	"time"
 )
 
 type Event struct {
@@ -36,61 +34,87 @@ type postData struct {
 	Data Payload `json:"data"`
 }
 
+func getBotMessage(message string) ([]byte, error) {
+
+	var botMessage []byte
+
+	if message == "誰最漂亮" {
+		botData := buildBotData("BOT001", "魔鏡", "是9N唷~")
+		return json.Marshal(botData)
+	}
+
+	if message == "我誰" {
+		botData := buildBotData("BOT002", "蛇丸寶貝", "我瘋子~")
+		return json.Marshal(botData)
+	}
+
+	return botMessage, nil
+}
+
+func buildBotData(id, author, message string) Payload {
+
+	return Payload{
+		Id:      id,
+		Author:  author,
+		Avatar:  "avatar-2.png",
+		Message: message,
+		Images:  "",
+		Time:    int(time.Now().Unix()),
+	}
+}
+
 func HandleRequest(request events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
 
-	var postData postData
-	err := json.Unmarshal([]byte(request.Body), &postData)
+	var data postData
+	err := json.Unmarshal([]byte(request.Body), &data)
 	if err != nil {
 		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
 	}
 
-	sess, err := session.NewSession(&aws.Config{Region: aws.String("us-west-2")})
-	if err != nil {
-		return events.APIGatewayProxyResponse{Body: "Session Error", StatusCode: 500}, nil
-	}
-	svc := dynamodb.New(sess)
+	botMessage, err := getBotMessage(data.Data.Message)
 
-	params := &dynamodb.ScanInput{
-		TableName: aws.String("iRepairChatRoom"),
-	}
-
-	result, err := svc.Scan(params)
 	if err != nil {
+		log.Println(err.Error())
 		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
 	}
 
-	var config *aws.Config
-	apiSession, err := session.NewSession(config)
+	message, err := json.Marshal(data.Data)
 	if err != nil {
-		return events.APIGatewayProxyResponse{Body: "Session Error", StatusCode: 500}, nil
+		log.Println(err.Error())
+		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
 	}
-	apiClient := apigatewaymanagementapi.New(apiSession)
-	apiClient.Endpoint = fmt.Sprintf("https://%s/%s", request.RequestContext.DomainName, request.RequestContext.Stage)
 
-	item := Item{}
-	for _, i := range result.Items {
+	connectionIds, err := ddb.GetConnections()
+	if err != nil {
+		log.Println(err)
+		return events.APIGatewayProxyResponse{Body: "DB error", StatusCode: 500}, nil
+	}
 
-		err = dynamodbattribute.UnmarshalMap(i, &item)
+	endpoint := fmt.Sprintf("https://%s/%s", request.RequestContext.DomainName, request.RequestContext.Stage)
+	apiConn, err := api.GetConnection()
+
+	if err != nil {
+		log.Println(err)
+		return events.APIGatewayProxyResponse{Body: "call back API connection error", StatusCode: 500}, nil
+	}
+
+	for _, connectionId := range connectionIds {
+
+		connId := string(connectionId)
+
+		_, err := apiConn.Post(endpoint, connId, message)
+
 		if err != nil {
-			return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
+			log.Println(err)
 		}
-		connectionId := item.ConnectionId
 
-		log.Println(item.ConnectionId)
+		if len(botMessage) > 0 {
 
-		message, err := json.Marshal(postData.Data)
-		if err != nil {
-			log.Println(err.Error())
-			return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
-		}
+			_, err := apiConn.Post(endpoint, connId, botMessage)
 
-		_, err = apiClient.PostToConnection(
-			&apigatewaymanagementapi.PostToConnectionInput{
-				ConnectionId: &connectionId,
-				Data:         message,
-			})
-		if err != nil {
-			return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
+			if err != nil {
+				log.Println(err)
+			}
 		}
 	}
 
