@@ -1,10 +1,10 @@
 package main
 
 import (
-	"context"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/justericgg/irepair/infra/repository/ddb"
+	"github.com/justericgg/irepair/chat/application/usecase"
+	"github.com/justericgg/irepair/chat/infra/repository/ddb"
 	"log"
 )
 
@@ -16,12 +16,14 @@ type Item struct {
 	ConnectionId string `json:"connectionId"`
 }
 
-func HandleRequest(ctx context.Context, event Event) (events.APIGatewayProxyResponse, error) {
+func HandleRequest(request events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
 
-	err := ddb.Put(event.RequestContext.ConnectionID)
+	svc := usecase.NewJoinRoomSvc(&ddb.RoomRepository{})
+	err := svc.Join(request.RequestContext.ConnectionID)
+
 	if err != nil {
 		log.Println(err)
-		return events.APIGatewayProxyResponse{Body: "ddb error", StatusCode: 500}, nil
+		return events.APIGatewayProxyResponse{Body: "error", StatusCode: 500}, nil
 	}
 
 	return events.APIGatewayProxyResponse{Body: "ok", StatusCode: 200}, nil
