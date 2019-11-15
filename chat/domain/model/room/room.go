@@ -15,7 +15,7 @@ func (r *Room) GetFirstUserConnId() string {
 
 func (r *Room) GetAllUserConnId() []string {
 
-	connIds := make([]string, len(r.users))
+	connIds := make([]string, 0, len(r.users))
 	for _, user := range r.users {
 		connIds = append(connIds, user.connectionId)
 	}

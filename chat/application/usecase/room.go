@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/justericgg/irepair/chat/domain/model/room"
 	"github.com/justericgg/irepair/chat/domain/repository"
+	domainservice "github.com/justericgg/irepair/chat/domain/service"
 	"github.com/justericgg/irepair/chat/infra/service"
 )
 
@@ -58,10 +59,15 @@ func NewMessageSvc(rRepo repository.RoomRepository, svc service.BroadcastSvc) *M
 	return &MessageSvc{rRepo, svc}
 }
 
+type Payload struct {
+	Action string       `json:"action"`
+	Data   room.Message `json:"data"`
+}
+
 func (svc *MessageSvc) ProcessMessage(endpoint, request string) error {
 
-	message := &room.Message{}
-	err := json.Unmarshal([]byte(request), &message)
+	payload := Payload{}
+	err := json.Unmarshal([]byte(request), &payload)
 	if err != nil {
 		return err
 	}
@@ -70,10 +76,13 @@ func (svc *MessageSvc) ProcessMessage(endpoint, request string) error {
 	if err != nil {
 		return err
 	}
-	theRoom.ReceiveMessage(*message)
+	theRoom.ReceiveMessage(payload.Data)
+
+	bot := domainservice.Bot{}
+	bot.AddMessageIfNeed(theRoom, payload.Data.Message)
 
 	svc.broadcastSvc.Endpoint = endpoint
-	err = svc.broadcastSvc.Broadcast(*theRoom)
+	err = svc.broadcastSvc.Broadcast(theRoom)
 	if err != nil {
 		return err
 	}

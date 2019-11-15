@@ -43,7 +43,7 @@ func (repo *RoomRepository) BuildRoomWithUsers() (*room.Room, error) {
 	}
 
 	item := Item{}
-	users := make([]room.User, len(result.Items))
+	users := make([]room.User, 0, len(result.Items))
 	for _, i := range result.Items {
 		err = dynamodbattribute.UnmarshalMap(i, &item)
 		if err != nil {

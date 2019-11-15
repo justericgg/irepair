@@ -11,7 +11,14 @@ type BroadcastSvc struct {
 	Endpoint string
 }
 
-func (svc *BroadcastSvc) Broadcast(theRoom room.Room) error {
+const Action = "sendmessage"
+
+type Payload struct {
+	Action string       `json:"action"`
+	Data   room.Message `json:"data"`
+}
+
+func (svc *BroadcastSvc) Broadcast(theRoom *room.Room) error {
 
 	conn, err := adapter.GetConnection()
 	if err != nil {
@@ -21,7 +28,13 @@ func (svc *BroadcastSvc) Broadcast(theRoom room.Room) error {
 	for _, connId := range theRoom.GetAllUserConnId() {
 
 		for _, message := range theRoom.GetMessages() {
-			data, err := json.Marshal(message)
+
+			payload := Payload{
+				Action: Action,
+				Data:   message,
+			}
+
+			data, err := json.Marshal(payload)
 			if err != nil {
 				log.Println(err.Error())
 			}
