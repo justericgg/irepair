@@ -46,3 +46,26 @@ func (repo *RoomRepository) Save(theRoom room.Room) error {
 
 	return nil
 }
+
+func (repo *RoomRepository) Delete(theRoom room.Room) error {
+
+	db, err := connect()
+	if err != nil {
+		return err
+	}
+
+	input := &dynamodb.DeleteItemInput{
+		Key: map[string]*dynamodb.AttributeValue{
+			"connectionId": {
+				S: aws.String(theRoom.GetFirstUserConnId()),
+			},
+		},
+		TableName: aws.String(tableName),
+	}
+	_, err = db.DeleteItem(input)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -25,3 +25,24 @@ func (svc *JoinRoomSvc) Join(connectionId string) error {
 
 	return nil
 }
+
+type LeaveRoomSvc struct {
+	repository repository.RoomRepository
+}
+
+func NewLeaveRoomSvc(repo repository.RoomRepository) *LeaveRoomSvc {
+	return &LeaveRoomSvc{repo}
+}
+
+func (svc *LeaveRoomSvc) Leave(connectionId string) error {
+
+	user := room.CreateUser(connectionId)
+	theRoom := room.NewRoom([]room.User{user})
+
+	err := svc.repository.Delete(*theRoom)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

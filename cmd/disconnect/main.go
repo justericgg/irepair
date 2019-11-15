@@ -4,7 +4,8 @@ import (
 	"context"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/justericgg/irepair/infra/repository/ddb"
+	"github.com/justericgg/irepair/chat/application/usecase"
+	"github.com/justericgg/irepair/chat/infra/repository/ddb"
 	"log"
 )
 
@@ -18,10 +19,12 @@ type Item struct {
 
 func HandleRequest(ctx context.Context, event Event) (events.APIGatewayProxyResponse, error) {
 
-	err := ddb.Delete(event.RequestContext.ConnectionID)
+	svc := usecase.NewLeaveRoomSvc(&ddb.RoomRepository{})
+	err := svc.Leave(event.RequestContext.ConnectionID)
+
 	if err != nil {
 		log.Println(err)
-		return events.APIGatewayProxyResponse{Body: "DB error", StatusCode: 500}, nil
+		return events.APIGatewayProxyResponse{Body: "error", StatusCode: 500}, nil
 	}
 
 	return events.APIGatewayProxyResponse{Body: "ok", StatusCode: 200}, nil
