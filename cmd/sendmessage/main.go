@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/justericgg/irepair/infra/adpter/api"
-	"github.com/justericgg/irepair/infra/repository/ddb"
+	"github.com/justericgg/irepair/chat/application/usecase"
+	"github.com/justericgg/irepair/chat/infra/repository/ddb"
+	"github.com/justericgg/irepair/chat/infra/service"
 	"log"
 	"time"
 )
@@ -65,57 +66,15 @@ func buildBotData(id, author, message string) Payload {
 
 func HandleRequest(request events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
 
-	var data postData
-	err := json.Unmarshal([]byte(request.Body), &data)
-	if err != nil {
-		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
-	}
-
-	botMessage, err := getBotMessage(data.Data.Message)
-
-	if err != nil {
-		log.Println(err.Error())
-		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
-	}
-
-	message, err := json.Marshal(data.Data)
-	if err != nil {
-		log.Println(err.Error())
-		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
-	}
-
-	connectionIds, err := ddb.GetConnections()
-	if err != nil {
-		log.Println(err)
-		return events.APIGatewayProxyResponse{Body: "DB error", StatusCode: 500}, nil
-	}
-
 	endpoint := fmt.Sprintf("https://%s/%s", request.RequestContext.DomainName, request.RequestContext.Stage)
-	apiConn, err := api.GetConnection()
 
+	roomRepo := &ddb.RoomRepository{}
+	broadcastSvc := service.BroadcastSvc{}
+	svc := usecase.NewMessageSvc(roomRepo, broadcastSvc)
+	err := svc.ProcessMessage(endpoint, request.Body)
 	if err != nil {
 		log.Println(err)
-		return events.APIGatewayProxyResponse{Body: "call back API connection error", StatusCode: 500}, nil
-	}
-
-	for _, connectionId := range connectionIds {
-
-		connId := string(connectionId)
-
-		_, err := apiConn.Post(endpoint, connId, message)
-
-		if err != nil {
-			log.Println(err)
-		}
-
-		if len(botMessage) > 0 {
-
-			_, err := apiConn.Post(endpoint, connId, botMessage)
-
-			if err != nil {
-				log.Println(err)
-			}
-		}
+		return events.APIGatewayProxyResponse{Body: "error", StatusCode: 500}, nil
 	}
 
 	return events.APIGatewayProxyResponse{Body: "ok", StatusCode: 200}, nil
@@ -124,3 +83,61 @@ func HandleRequest(request events.APIGatewayWebsocketProxyRequest) (events.APIGa
 func main() {
 	lambda.Start(HandleRequest)
 }
+
+//func AHandleRequest(request events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
+//
+//	var data postData
+//	err := json.Unmarshal([]byte(request.Body), &data)
+//	if err != nil {
+//		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
+//	}
+//
+//	botMessage, err := getBotMessage(data.Data.Message)
+//
+//	if err != nil {
+//		log.Println(err.Error())
+//		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
+//	}
+//
+//	message, err := json.Marshal(data.Data)
+//	if err != nil {
+//		log.Println(err.Error())
+//		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
+//	}
+//
+//	connectionIds, err := ddb.GetConnections()
+//	if err != nil {
+//		log.Println(err)
+//		return events.APIGatewayProxyResponse{Body: "DB error", StatusCode: 500}, nil
+//	}
+//
+//	endpoint := fmt.Sprintf("https://%s/%s", request.RequestContext.DomainName, request.RequestContext.Stage)
+//	apiConn, err := api.GetConnection()
+//
+//	if err != nil {
+//		log.Println(err)
+//		return events.APIGatewayProxyResponse{Body: "call back API connection error", StatusCode: 500}, nil
+//	}
+//
+//	for _, connectionId := range connectionIds {
+//
+//		connId := string(connectionId)
+//
+//		_, err := apiConn.Post(endpoint, connId, message)
+//
+//		if err != nil {
+//			log.Println(err)
+//		}
+//
+//		if len(botMessage) > 0 {
+//
+//			_, err := apiConn.Post(endpoint, connId, botMessage)
+//
+//			if err != nil {
+//				log.Println(err)
+//			}
+//		}
+//	}
+//
+//	return events.APIGatewayProxyResponse{Body: "ok", StatusCode: 200}, nil
+//}

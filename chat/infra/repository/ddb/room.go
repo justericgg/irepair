@@ -26,6 +26,37 @@ func connect() (*dynamodb.DynamoDB, error) {
 
 type RoomRepository struct{}
 
+func (repo *RoomRepository) BuildRoomWithUsers() (*room.Room, error) {
+
+	db, err := connect()
+	if err != nil {
+		return nil, err
+	}
+
+	params := &dynamodb.ScanInput{
+		TableName: aws.String(tableName),
+	}
+
+	result, err := db.Scan(params)
+	if err != nil {
+		return nil, err
+	}
+
+	item := Item{}
+	users := make([]room.User, len(result.Items))
+	for _, i := range result.Items {
+		err = dynamodbattribute.UnmarshalMap(i, &item)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, room.CreateUser(item.ConnectionId))
+	}
+
+	theRoom := room.NewRoom(users)
+
+	return theRoom, nil
+}
+
 func (repo *RoomRepository) Save(theRoom room.Room) error {
 
 	db, err := connect()
